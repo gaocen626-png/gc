@@ -79,29 +79,30 @@
     const BIN_ID = '69e798f9856a68218959a61e';
     let logsData = [];
     
-    async function loadData() {
-        try {
-            const r = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, { headers: { 'X-Master-Key': API_KEY } });
-            const d = await r.json();
+    function loadData() {
+        fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, { headers: { 'X-Master-Key': API_KEY } })
+        .then(function(res) { return res.json(); })
+        .then(function(d) {
             logsData = d.record && d.record.logs ? d.record.logs : [];
             renderTable();
             updateStats(logsData);
-        } catch(e) {
+        }).catch(function() {
             document.getElementById('tableContent').innerHTML = '<div class="empty">加载失败，请检查网络连接</div>';
-        }
+        });
     }
     
     function updateStats(logs) {
         document.getElementById('totalSearches').textContent = logs.length;
         
-        const keywords = new Set(logs.map(l => l.keyword).filter(k => k && k !== '(无)'));
+        var keywords = new Set(logs.map(function(l) { return l.keyword; }).filter(function(k) { return k && k !== '(无)'; }));
         document.getElementById('uniqueKeywords').textContent = keywords.size;
         
-        const avg = logs.length > 0 ? Math.round(logs.reduce((sum, l) => sum + (l.count || 0), 0) / logs.length) : 0;
+        var avg = logs.length > 0 ? Math.round(logs.reduce(function(sum, l) { return sum + (l.count || 0); }, 0) / logs.length) : 0;
         document.getElementById('avgResults').textContent = avg;
         
-        const today = new Date().toLocaleDateString('zh-CN');
-        const todayCount = logs.filter(l => l.time && l.time.startsWith(today)).length;
+        var now = new Date();
+        var today = now.getFullYear() + '/' + (now.getMonth() + 1) + '/' + now.getDate();
+        var todayCount = logs.filter(function(l) { return l.time && l.time.indexOf(today) === 0; }).length;
         document.getElementById('todaySearches').textContent = todayCount;
     }
     
@@ -111,18 +112,19 @@
             return;
         }
         
-        let html = '<table><thead><tr><th>时间</th><th>学历筛选</th><th>搜索关键词</th><th>匹配岗位数</th></tr></thead><tbody>';
+        var html = '<table><thead><tr><th>时间</th><th>学历筛选</th><th>搜索关键词</th><th>匹配岗位数</th></tr></thead><tbody>';
         
         // 按时间倒序
-        const sorted = [...logsData].reverse();
+        var sorted = logsData.slice().reverse();
         
-        for (const log of sorted) {
-            html += `<tr>
-                <td>${log.time || '-'}</td>
-                <td><span class="tag">${log.education || '全部'}</span></td>
-                <td><span class="keyword-highlight">${log.keyword || '-'}</span></td>
-                <td><strong>${log.count || 0}</strong> 个</td>
-            </tr>`;
+        for (var i = 0; i < sorted.length; i++) {
+            var log = sorted[i];
+            html += '<tr>' +
+                '<td>' + (log.time || '-') + '</td>' +
+                '<td><span class="tag">' + (log.education || '全部') + '</span></td>' +
+                '<td><span class="keyword-highlight">' + (log.keyword || '-') + '</span></td>' +
+                '<td><strong>' + (log.count || 0) + '</strong> 个</td>' +
+            '</tr>';
         }
         
         html += '</tbody></table>';
@@ -135,16 +137,18 @@
             return;
         }
         
-        let csv = '\ufeff时间,学历筛选,搜索关键词,匹配岗位数\n';
-        for (const log of logsData) {
-            csv += `"${log.time || ''}","${log.education || ''}","${log.keyword || ''}","${log.count || 0}"\n`;
+        var csv = '\ufeff时间,学历筛选,搜索关键词,匹配岗位数\n';
+        for (var i = 0; i < logsData.length; i++) {
+            var log = logsData[i];
+            csv += '"' + (log.time || '') + '","' + (log.education || '') + '","' + (log.keyword || '') + '","' + (log.count || 0) + '"\n';
         }
         
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
+        var blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
         a.href = url;
-        a.download = `搜索记录_${new Date().toLocaleDateString('zh-CN')}.csv`;
+        var now = new Date();
+        a.download = '搜索记录_' + now.getFullYear() + '-' + (now.getMonth() + 1) + '-' + now.getDate() + '.csv';
         a.click();
     }
     
@@ -154,31 +158,31 @@
             return;
         }
         
-        const json = JSON.stringify(logsData, null, 2);
-        const blob = new Blob([json], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
+        var json = JSON.stringify(logsData, null, 2);
+        var blob = new Blob([json], { type: 'application/json' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
         a.href = url;
-        a.download = `搜索记录_${new Date().toLocaleDateString('zh-CN')}.json`;
+        var now = new Date();
+        a.download = '搜索记录_' + now.getFullYear() + '-' + (now.getMonth() + 1) + '-' + now.getDate() + '.json';
         a.click();
     }
     
-    async function clearData() {
+    function clearData() {
         if (!confirm('确定要清空所有搜索记录吗？此操作不可恢复！')) return;
         
-        try {
-            await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'X-Master-Key': API_KEY },
-                body: JSON.stringify({ logs: [] })
-            });
+        fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'X-Master-Key': API_KEY },
+            body: JSON.stringify({ logs: [] })
+        }).then(function() {
             logsData = [];
             renderTable();
             updateStats([]);
             alert('记录已清空');
-        } catch(e) {
+        }).catch(function() {
             alert('清空失败，请重试');
-        }
+        });
     }
     
     // 页面加载时自动获取数据
