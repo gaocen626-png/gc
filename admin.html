@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>搜索记录管理 - 荆门市人才需求目录</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f5; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 16px; margin-bottom: 24px; }
+        .header h1 { font-size: 28px; margin-bottom: 10px; }
+        .stats-box { background: white; border-radius: 12px; padding: 24px; margin-bottom: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+        .stat-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 12px; text-align: center; }
+        .stat-number { font-size: 36px; font-weight: bold; margin-bottom: 8px; }
+        .stat-label { font-size: 14px; opacity: 0.9; }
+        .actions { margin-bottom: 24px; display: flex; gap: 12px; flex-wrap: wrap; }
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s; }
+        .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .btn-danger { background: #ff4757; color: white; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        .table-box { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #f8f9fa; font-weight: 600; color: #333; }
+        tr:hover { background: #f8f9fa; }
+        .loading { text-align: center; padding: 40px; color: #666; }
+        .empty { text-align: center; padding: 40px; color: #999; }
+        .tag { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; background: #e8f5e9; color: #2e7d32; }
+        .keyword-highlight { background: #fff3cd; padding: 2px 6px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 搜索记录管理后台</h1>
+            <p>荆门市2026年度人才需求目录 - 搜索数据分析</p>
+        </div>
+        
+        <div class="stats-box">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number" id="totalSearches">-</div>
+                    <div class="stat-label">总搜索次数</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="uniqueKeywords">-</div>
+                    <div class="stat-label">不同关键词数</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="avgResults">-</div>
+                    <div class="stat-label">平均匹配岗位</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="todaySearches">-</div>
+                    <div class="stat-label">今日搜索次数</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="actions">
+            <button class="btn btn-primary" onclick="exportData()">📥 导出为Excel</button>
+            <button class="btn btn-primary" onclick="exportJSON()">📋 导出为JSON</button>
+            <button class="btn btn-danger" onclick="clearData()">🗑️ 清空记录</button>
+            <button class="btn btn-primary" onclick="loadData()">🔄 刷新数据</button>
+        </div>
+        
+        <div class="table-box">
+            <h3 style="margin-bottom: 16px;">搜索记录详情</h3>
+            <div id="tableContent">
+                <div class="loading">正在加载数据...</div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+    const API_KEY = '$2a$10$R.qRRUMH15nJ73PZjRqQwOsxRi51kFZmhFEd.738Gh8tCdAaR82GS';
+    const BIN_ID = '69e798f9856a68218959a61e';
+    let logsData = [];
+    
+    async function loadData() {
+        try {
+            const r = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, { headers: { 'X-Master-Key': API_KEY } });
+            const d = await r.json();
+            logsData = d.record && d.record.logs ? d.record.logs : [];
+            renderTable();
+            updateStats(logsData);
+        } catch(e) {
+            document.getElementById('tableContent').innerHTML = '<div class="empty">加载失败，请检查网络连接</div>';
+        }
+    }
+    
+    function updateStats(logs) {
+        document.getElementById('totalSearches').textContent = logs.length;
+        
+        const keywords = new Set(logs.map(l => l.keyword).filter(k => k && k !== '(无)'));
+        document.getElementById('uniqueKeywords').textContent = keywords.size;
+        
+        const avg = logs.length > 0 ? Math.round(logs.reduce((sum, l) => sum + (l.count || 0), 0) / logs.length) : 0;
+        document.getElementById('avgResults').textContent = avg;
+        
+        const today = new Date().toLocaleDateString('zh-CN');
+        const todayCount = logs.filter(l => l.time && l.time.startsWith(today)).length;
+        document.getElementById('todaySearches').textContent = todayCount;
+    }
+    
+    function renderTable() {
+        if (logsData.length === 0) {
+            document.getElementById('tableContent').innerHTML = '<div class="empty">暂无搜索记录</div>';
+            return;
+        }
+        
+        let html = '<table><thead><tr><th>时间</th><th>学历筛选</th><th>搜索关键词</th><th>匹配岗位数</th></tr></thead><tbody>';
+        
+        // 按时间倒序
+        const sorted = [...logsData].reverse();
+        
+        for (const log of sorted) {
+            html += `<tr>
+                <td>${log.time || '-'}</td>
+                <td><span class="tag">${log.education || '全部'}</span></td>
+                <td><span class="keyword-highlight">${log.keyword || '-'}</span></td>
+                <td><strong>${log.count || 0}</strong> 个</td>
+            </tr>`;
+        }
+        
+        html += '</tbody></table>';
+        document.getElementById('tableContent').innerHTML = html;
+    }
+    
+    function exportData() {
+        if (logsData.length === 0) {
+            alert('没有数据可导出');
+            return;
+        }
+        
+        let csv = '\ufeff时间,学历筛选,搜索关键词,匹配岗位数\n';
+        for (const log of logsData) {
+            csv += `"${log.time || ''}","${log.education || ''}","${log.keyword || ''}","${log.count || 0}"\n`;
+        }
+        
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `搜索记录_${new Date().toLocaleDateString('zh-CN')}.csv`;
+        a.click();
+    }
+    
+    function exportJSON() {
+        if (logsData.length === 0) {
+            alert('没有数据可导出');
+            return;
+        }
+        
+        const json = JSON.stringify(logsData, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `搜索记录_${new Date().toLocaleDateString('zh-CN')}.json`;
+        a.click();
+    }
+    
+    async function clearData() {
+        if (!confirm('确定要清空所有搜索记录吗？此操作不可恢复！')) return;
+        
+        try {
+            await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'X-Master-Key': API_KEY },
+                body: JSON.stringify({ logs: [] })
+            });
+            logsData = [];
+            renderTable();
+            updateStats([]);
+            alert('记录已清空');
+        } catch(e) {
+            alert('清空失败，请重试');
+        }
+    }
+    
+    // 页面加载时自动获取数据
+    loadData();
+    </script>
+</body>
+</html>
